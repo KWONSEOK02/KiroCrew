@@ -1036,14 +1036,28 @@ def _send(
         return _transport_failure(str(e), mark_transport_error)
 
 
-def _post(path: str, body: dict | None = None, *, timeout: float = 30) -> dict:
+def _post(
+    path: str,
+    body: dict | None = None,
+    *,
+    timeout: float = 30,
+    session_key: str | None = None,
+) -> dict:
+    """POST a loopback gateway path with the internal-secret handshake.
+
+    ``session_key``: as in :func:`_patch`. A caller gated on
+    :func:`_resolve_session_key_strict` must send the key it verified --
+    re-resolving through the lenient walk here would let the request carry a
+    different session's authority than the one the gate approved, so the check
+    and the action would authorize as different sessions.
+    """
     data = json.dumps(body or {}).encode()
     headers = {
         "Content-Type": "application/json",
         "X-Internal-Secret": _internal_secret(),
         **_caller_header(),
     }
-    sk = _resolve_session_key()
+    sk = _resolve_session_key() if session_key is None else session_key
     _sk_err = _session_key_header_error(sk)
     if _sk_err:
         return {"error": _sk_err}

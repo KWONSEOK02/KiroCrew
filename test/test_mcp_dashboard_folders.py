@@ -1260,6 +1260,62 @@ class TestPrivateSessionsAreInvisible:
         mock_patch.assert_not_called()
 
 
+class TestTheVerifiedCallerKeyReachesTheRequest:
+    """The gate resolves the caller strictly; the request must SEND that key.
+
+    Gating on `_resolve_session_key_strict` and then letting the request helper
+    resolve again authorizes the check and the action as potentially different
+    sessions: the lenient walk reads mutable process state, so what it answers
+    at request time need not be what the gate approved. The endpoint authorizes
+    on the key it receives, which makes the sent key the security-relevant one.
+    """
+
+    VERIFIED = "dashboard:chat-verified"
+
+    def test_create_carries_the_verified_key(self):
+        with patch(
+            "kiro_crew.mcp_dashboard._resolve_session_key_strict", return_value=self.VERIFIED
+        ), patch(
+            "kiro_crew.mcp_dashboard._post", return_value={"target": "chat-2", "title": "w"}
+        ) as post:
+            _call_tool_inner("session_create", {"title": "worker"})
+        assert post.call_args.kwargs["session_key"] == self.VERIFIED
+
+    def test_stop_carries_the_verified_key(self):
+        with patch(
+            "kiro_crew.mcp_dashboard._resolve_session_key_strict", return_value=self.VERIFIED
+        ), patch("kiro_crew.mcp_dashboard._post", return_value={"ok": True}) as post:
+            _call_tool_inner("session_stop", {"target": "peer"})
+        assert post.call_args.kwargs["session_key"] == self.VERIFIED
+
+    def test_read_carries_the_verified_key(self):
+        with patch(
+            "kiro_crew.mcp_dashboard._resolve_session_key_strict", return_value=self.VERIFIED
+        ), patch(
+            "kiro_crew.mcp_dashboard._get", return_value={"messages": [], "total": 0}
+        ) as get:
+            _call_tool_inner("session_read_message", {"target": "peer"})
+        # `_get` takes the key positionally, matching its signature.
+        assert get.call_args.args[1] == self.VERIFIED
+
+    def test_an_unverifiable_caller_never_reaches_the_request(self):
+        """The refusal must precede the call, not merely alter its key."""
+        with patch(
+            "kiro_crew.mcp_dashboard._resolve_session_key_strict", return_value=""
+        ), patch("kiro_crew.mcp_dashboard._post") as post, patch(
+            "kiro_crew.mcp_dashboard._get"
+        ) as get:
+            for tool, args in (
+                ("session_create", {"title": "worker"}),
+                ("session_stop", {"target": "peer"}),
+                ("session_read_message", {"target": "peer"}),
+            ):
+                out = _call_tool_inner(tool, args)
+                assert "cannot be identified" in out
+        post.assert_not_called()
+        get.assert_not_called()
+
+
 class TestAdvertisedSet:
     """Reaching this server means an agent spec referenced it.
 
@@ -1274,4 +1330,7 @@ class TestAdvertisedSet:
             "chat_folder_create",
             "chat_folder_move",
             "chat_folder_move_session",
+            "session_create",
+            "session_stop",
+            "session_read_message",
         }

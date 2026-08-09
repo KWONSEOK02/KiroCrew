@@ -1555,6 +1555,19 @@ class AgentConfig:
             "and additionally to 60s below the turn ceiling at load time.",
         ),
     )
+    session_control: bool = field(
+        default=True,
+        metadata=_meta(
+            "Session Control",
+            "Let one chat session open a new session, and stop or read another "
+            "session of yours. No session writes into another session's "
+            "conversation: reading returns a transcript tail, stopping cancels an "
+            "in-flight turn, and a created session starts empty for you to type "
+            "into. Turn it off to make the three tools refuse. Sessions can only "
+            "reach peers in the same workspace; incognito, app-scoped and scheduled "
+            "sessions are never addressable.",
+        ),
+    )
     subagent_cost_gb: float = field(
         default=0.5,
         metadata=_meta(
@@ -6062,6 +6075,12 @@ class KiroCrewConfig:
                     TOOL_APPROVAL_TIMEOUT_MIN,
                     TOOL_APPROVAL_TIMEOUT_MAX,
                 ),
+                # A malformed value falls to False, not to the field default:
+                # this switch grants one session reach into another, so
+                # ``{"session_control": "false"}`` — a truthy string — must not
+                # load as enabled. Absent stays enabled, because ``.get`` hands
+                # back a real ``True`` for the missing case.
+                session_control=_safe_bool(agent_data.get("session_control", True), False),
                 subagent_cost_gb=_safe_float(agent_data.get("subagent_cost_gb", 0.5), 0.5),
                 subagent_cpu_cost_cores=_safe_float(
                     agent_data.get("subagent_cpu_cost_cores", 1.0), 1.0

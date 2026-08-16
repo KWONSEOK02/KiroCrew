@@ -4,6 +4,55 @@ All notable changes to KiroCrew are documented in this file.
 
 ## [Unreleased]
 
+- **A malformed `config.json` no longer silently reopens the Slack
+  enterprise-origin allowlist.** `KiroCrewConfig.load()` normalizes a torn or
+  malformed config away and returns a defaults-shaped object instead of raising,
+  so `slack.allowed_enterprise_ids` came back empty -- indistinguishable from
+  "operator configured no allowlist" -- and `check_message_origin()` fell back to
+  its default-open path, accepting messages from any Slack workspace with no
+  error surfaced. `slack/enterprise.py` now reads the allowlist through ONE
+  validated read that answers both "is this config usable" and "what is the
+  allowlist", so the two answers cannot disagree; previously the value came from
+  `load()` while health was probed separately, and every shape where those two
+  diverged was another way in (non-object file, torn `config.local.json` overlay
+  leaving the base list in force, non-object `slack` section, and an allowlist
+  whose entries are all unusable). Any of those now fails CLOSED -- allowlist
+  enforced with NO origin admitted, SEL-audited -- while a
+  genuinely absent or empty allowlist stays default-open exactly as before.
+  A degraded read is also no longer re-widened by caller-supplied `extra_ids`:
+  that value is the caller's own `load()` result, which drops a torn overlay and
+  so still carries the pre-overlay base list, which would have re-admitted the
+  very origins the overlay removed. A config path that is a SYMLINK whose target
+  is missing now fails closed too, rather than counting as an absent file: the
+  link is a configuration artifact, so config was meant to be there and is
+  merely unavailable. An intact symlink is read normally.
+  **Behaviour change:** `extra_ids` no longer contributes to the admitted set on
+  a SUCCESSFUL read either -- the validated read is the sole source of the
+  allowlist. Callers pass their own earlier `load()` snapshot of the same
+  `slack.allowed_enterprise_ids` key, so that snapshot is never newer and can
+  differ only by holding ids the operator has since REMOVED; unioning it
+  re-admitted exactly those. This cuts both ways, by design: removing one id
+  from the list now takes effect (previously a stale snapshot kept admitting
+  it), and emptying the list entirely now returns to default-open (previously a
+  stale snapshot kept enforcing the deleted restriction). Both are the same
+  rule -- the file decides, including when it decides to list nothing -- and
+  both match what the next restart already did. `extra_ids` is still honoured on
+  the `auth.test`-failure path, where a non-empty value forces a deny and so
+  cannot admit anything.
+  **Behaviour change:** a degraded read now admits NOTHING, where it previously
+  admitted the just-validated workspace. Answering "which workspace may
+  authenticate" with "whichever one just did" is the restriction's own question,
+  and on a non-Grid workspace it was permissive: the checked candidate is the
+  bare `team_id`, so a bot token pointing at a foreign workspace validated
+  against itself. The token lives in `.env`/the environment and the allowlist in
+  `config.json`, so these are separate write surfaces. An unreadable config now
+  refuses Slack startup instead of running unguarded.
+  **Behaviour change:** on the `auth.test`-failure path an unreadable config used
+  to be swallowed and treated as "no restriction configured", which accepted an
+  unverifiable workspace; it now fails closed like the startup path. Same root
+  cause as the publish allowlist fixed in #3615, at call sites that fix did not
+  cover. (#3945)
+
 - **MCP servers can now be measured for shareability on purpose, and the answer
   survives until the server itself changes.** The Sharing assessment could only
   say as much as the number of servers carrying a measurement, and reaching one

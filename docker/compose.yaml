@@ -41,6 +41,8 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       WECOM_BOT_ID: ${WECOM_BOT_ID:-}
       WECOM_SECRET: ${WECOM_SECRET:-}
+      FEISHU_APP_ID: ${FEISHU_APP_ID:-}
+      FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
       WEBEX_BOT_TOKEN: ${WEBEX_BOT_TOKEN:-}
       # kiro-cli's own model credential — the alternative to the one-time
       # `kiro-cli login` above. Scrubbed into the data home's .env like the

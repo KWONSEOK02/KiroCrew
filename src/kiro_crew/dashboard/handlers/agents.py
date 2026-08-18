@@ -1667,6 +1667,56 @@ async def api_kirocrew_agent_resolved_model(request: web.Request) -> web.Respons
     )
 
 
+def _model_pin_rejected(model: str, request: web.Request, provider: str) -> str | None:
+    """Reason a crew's model pin is unusable, or ``None`` to allow it.
+
+    An agent's ``model`` is read by kiro-cli when the child starts, so a pin the
+    account cannot serve kills every session and subagent using that agent
+    seconds after spawn, before anything can inspect it. Rejecting it here — at
+    the one moment a human is looking at the value — turns that into a single
+    message on the surface that authored it.
+
+    *provider* is passed in rather than resolved here so this whole path adds no
+    config read of its own: every caller already holds a loaded config, and
+    ``KiroCrewConfig.load()`` deep-copies the validated dict even on a cache
+    hit — work that must not land on the event loop while the config lock is
+    held. It is forwarded to the validator for the same reason.
+
+    Delegates to the per-role validator so the crew form, the role pins and the
+    session-init withhold all apply one predicate. ``""``/``"auto"`` mean
+    inherit and always pass; an unknown advertised set means entitlement is
+    unknowable, and the validator accepts rather than accusing on no evidence.
+    """
+    # circular import: handlers.core resolves _get_config_lock from this module,
+    # so importing it at module scope would close the cycle.
+    from kiro_crew.dashboard.handlers.core import _validate_role_model
+
+    reason = _validate_role_model(model, request, provider=provider)
+    if reason:
+        return reason
+    # That validator's entitlement half needs a live advertised set and accepts
+    # when there is none, so it cannot see a WRONG-FLAVOUR spelling. The registry
+    # knows each model under several spellings and only one is what kiro-cli
+    # serves; the others reach the child verbatim and kill it at startup.
+    correction = model_registry.acp_id_correction(model)
+    if correction:
+        # Deliberately NOT prescriptive. Upstream naming does not line up across
+        # providers — Bedrock's ``claude-opus-4-8`` is the registry's
+        # ``claude-opus-4.5``, while ``claude-opus-4-8[1m]`` is ``claude-opus-4.8``
+        # — so a user who typed the Bedrock spelling meaning "Opus 4.8" may not
+        # want the id this maps to. Telling them to adopt it would steer a
+        # plausible-intent user into a quieter capability change than the one
+        # they asked for. Report the mapping, show what is actually served, and
+        # let them choose.
+        served = ", ".join(model_registry.available_models("acp")[:8]) or "auto"
+        return (
+            f"{model!r} is not a model kiro-cli serves. The registry maps that "
+            f"spelling to {correction!r} — confirm that is the model you want, or "
+            f"pick one of: {served}, or 'auto'."
+        )
+    return None
+
+
 async def api_kirocrew_agents_create(request: web.Request) -> web.Response:
     """POST /api/agents — create a new KiroCrew agent."""
 
@@ -1677,19 +1727,25 @@ async def api_kirocrew_agents_create(request: web.Request) -> web.Response:
     name = body.get("name", "").strip()
     if not name:
         return web.json_response({"error": "Agent name is required"}, status=400)
+    # Passed RAW, not str()-coerced: normalize_agent_model is total and maps a
+    # non-string to "" (inherit). Wrapping in str() first would turn
+    # {"model": 123} into the literal "123", which normalizes to a string the
+    # backend then rejects as an unknown model id.
+    model = normalize_agent_model(body.get("model"))
     async with _get_config_lock():
         cfg = KiroCrewConfig.load()
         if name in cfg.agents:
             return web.json_response({"error": f"Agent '{name}' already exists"}, status=409)
+        model_reason = _model_pin_rejected(model, request, cfg.agent.provider)
+        if model_reason:
+            return web.json_response(
+                {"error": model_reason, "code": "invalid_model"}, status=400
+            )
         cfg.agents[name] = KiroCrewAgentConfig(
             kiro_agent=body.get("kiro_agent", "kirocrew"),
             workspace=body.get("workspace", "default"),
             memory_store=body.get("memory_store", "default"),
-            # Passed RAW, not str()-coerced: normalize_agent_model is total and
-            # maps a non-string to "" (inherit). Wrapping in str() first would
-            # turn {"model": 123} into the literal "123", which normalizes to a
-            # string the backend then rejects as an unknown model id.
-            model=normalize_agent_model(body.get("model")),
+            model=model,
             description=body.get("description", ""),
             triggers=body.get("triggers", ""),
             source=body.get("source", "kirocrew"),
@@ -1713,10 +1769,20 @@ async def api_kirocrew_agent_update(request: web.Request) -> web.Response:
         body = await request.json()
     except Exception:
         return web.json_response({"error": "invalid JSON"}, status=400)
+    if "model" in body:
+        pending_model = normalize_agent_model(body["model"])
     async with _get_config_lock():
         cfg = KiroCrewConfig.load()
         if name not in cfg.agents:
             return web.json_response({"error": f"Agent '{name}' not found"}, status=404)
+        if "model" in body:
+            # Validated before the write, reusing the config loaded just above so
+            # this costs no extra read.
+            model_reason = _model_pin_rejected(pending_model, request, cfg.agent.provider)
+            if model_reason:
+                return web.json_response(
+                    {"error": model_reason, "code": "invalid_model"}, status=400
+                )
         agent = cfg.agents[name]
         changed: list[str] = []
         if "kiro_agent" in body:

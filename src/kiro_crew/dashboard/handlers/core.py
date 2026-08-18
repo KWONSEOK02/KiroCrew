@@ -1078,9 +1078,7 @@ def _build_stt_install_script(provider: str = "whisper") -> str:
     if provider in ("mlx", "parakeet"):
         pipx_pkg = "parakeet-mlx" if provider == "parakeet" else "mlx-whisper"
         verify_bin = "parakeet-mlx" if provider == "parakeet" else "mlx_whisper"
-        return (
-            prelude
-            + rf"""
+        return prelude + rf"""
 [ -d "$HOME/ffmpeg" ] && export PATH="$HOME/ffmpeg:$PATH"
 
 if ! command -v brew >/dev/null 2>&1; then
@@ -1101,7 +1099,6 @@ pipx install --force {pipx_pkg} 2>&1 || {{ echo "ERROR: pipx install {pipx_pkg} 
 
 echo "Done. {verify_bin}=$(command -v {verify_bin} 2>/dev/null || echo 'check PATH') ffmpeg=$(command -v ffmpeg 2>/dev/null || echo 'MISSING')"
 """
-        )
     return prelude + r"""
 # Pick up ffmpeg from ~/ffmpeg if installed there
 [ -d "$HOME/ffmpeg" ] && export PATH="$HOME/ffmpeg:$PATH"
@@ -1550,7 +1547,9 @@ def _active_advertised_ids(request: web.Request) -> list[str] | None:
     return None
 
 
-def _validate_role_model(value: str, request: web.Request) -> str | None:
+def _validate_role_model(
+    value: str, request: web.Request, provider: str | None = None
+) -> str | None:
     """Reject a per-role model pin the account cannot use; ``None`` = allow.
 
     ``""`` / ``"auto"`` always allow (they defer to the chat default). Otherwise
@@ -1560,13 +1559,17 @@ def _validate_role_model(value: str, request: web.Request) -> str | None:
     (:func:`model_is_unusable`, #1596) so the picker and the wire cannot disagree.
     No advertised set => accept (entitlement unknowable; don't accuse on no
     evidence), matching that predicate's own conservative default.
+
+    *provider* is forwarded to :func:`_model_rejected_reason` so a caller holding
+    an already-loaded config does not pay a second synchronous config read; the
+    remaining work is in-memory. Omit it and the provider is resolved there.
     """
     if not value or value == "auto":
         return None
     from kiro_crew.acp.client import model_is_unusable
     from kiro_crew.dashboard.chat_handlers import _model_rejected_reason
 
-    reason = _model_rejected_reason(value)
+    reason = _model_rejected_reason(value, provider=provider)
     if reason:
         return reason
     advertised = _active_advertised_ids(request)

@@ -122,4 +122,32 @@ describe('AppDetailPage — auto-action deep links', () => {
     renderDetail({ state: { autoAction: 'update' } })
     await waitFor(() => expect(installFromRegistryStream).toHaveBeenCalled())
   })
+
+  it('syncs a PATH-installed app from its directory, never through the registry', async () => {
+    // The registry install stream can only serve an app the registry lists, so
+    // an app installed from a directory used to fail its own Sync with
+    // "app not found in registry" while being installed, enabled and working.
+    getApp.mockResolvedValue({
+      name: 'secretary', displayName: 'Secretary', version: '0.1.0', enabled: true,
+      source: '/home/u/apps/secretary', origin: 'local',
+      resources: 'gateway', lifecycle: 'gateway', installedAt: '2026-07-01T00:00:00Z',
+      manifest: { displayName: 'Secretary', description: 'Slack inbox manager.', author: 'zezhexu' },
+    })
+    listRegistry.mockResolvedValue({ apps: [], serverPlatform: { os: 'darwin', arch: 'arm64' } })
+    renderDetail({ state: { autoAction: 'update' } })
+    await waitFor(() => expect(updateApp).toHaveBeenCalledWith('secretary'))
+    expect(installFromRegistryStream).not.toHaveBeenCalled()
+  })
+
+  it('keeps the registry stream for an app whose source IS a registry ref', async () => {
+    getApp.mockResolvedValue({
+      name: 'secretary', displayName: 'Secretary', version: '1.0.0', enabled: true,
+      source: 'registry:secretary', origin: 'registry',
+      resources: 'gateway', lifecycle: 'gateway', installedAt: '2026-07-01T00:00:00Z',
+      manifest: { displayName: 'Secretary', description: 'Slack inbox manager.', author: 'zezhexu' },
+    })
+    renderDetail({ state: { autoAction: 'update' } })
+    await waitFor(() => expect(installFromRegistryStream).toHaveBeenCalled())
+    expect(updateApp).not.toHaveBeenCalled()
+  })
 })

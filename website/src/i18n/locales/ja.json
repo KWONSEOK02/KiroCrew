@@ -4491,7 +4491,8 @@
         "uninstall": "アンインストール",
         "update": "更新",
         "update_to": "v{{version}} に更新",
-        "v": "v"
+        "v": "v",
+        "syncing": "同期中…"
       },
       "sourcesPopover": {
         "developer_install_of_a_local_app_directory_equiv": "ローカルアプリディレクトリの開発者インストール (同等",
@@ -6990,7 +6991,8 @@
       "update_other": "{{count}} 更新",
       "updating_progress": "更新中 {{done}}/{{total}}…",
       "v": "v",
-      "installed_app_find_in_library_and_enable": "{{name}} をインストールしました。下でオンにして有効化してください。"
+      "installed_app_find_in_library_and_enable": "{{name}} をインストールしました。下でオンにして有効化してください。",
+      "synced_from_its_source_directory": "{{name}} をソースディレクトリから同期しました。"
     },
     "artifactDeployPage": {
       "0_00_mo": "~$0.00/月",

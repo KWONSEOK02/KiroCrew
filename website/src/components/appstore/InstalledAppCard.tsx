@@ -196,7 +196,14 @@ export default function InstalledAppCard({
                 disabled={actionLoading === `${app.name}:update`}
                 title={i18nT('components.appstore.installedAppCard.sync_app_from_its_source_directory')}
               >
-                <RefreshCw size={14} /> {i18nT('components.appstore.installedAppCard.sync')}
+                {/* Copying a large source directory is not instant, and a
+                    disabled-only button reads as dead rather than busy — the
+                    same reason the uninstall confirm swaps to "Removing…". */}
+                {actionLoading === `${app.name}:update` ? (
+                  <><RefreshCw size={14} className="animate-spin" /> {i18nT('components.appstore.installedAppCard.syncing')}</>
+                ) : (
+                  <><RefreshCw size={14} /> {i18nT('components.appstore.installedAppCard.sync')}</>
+                )}
               </Btn>
             )}
 

@@ -4,6 +4,7 @@ import { gradientFor } from '../components/appstore/gradient'
 import {
   sourceLabel,
   isVerified,
+  isRegistrySourced,
   normalizeRegistryApp,
   normalizeInstalledApp,
   normalizeInstalledApps,
@@ -139,6 +140,30 @@ describe('provenance helpers', () => {
     // A real built-in (no _registry) still verifies and labels correctly.
     expect(isVerified({ origin: 'builtin', author: 'whoever' })).toBe(true)
     expect(sourceLabel({ origin: 'builtin' })).toBe('Built-in')
+  })
+})
+
+describe('isRegistrySourced', () => {
+  it('reads the registry: prefix the gateway records on a cloned app', () => {
+    expect(isRegistrySourced({ source: 'registry:secretary' })).toBe(true)
+    expect(isRegistrySourced({ source: 'registry:secretary', origin: 'local' })).toBe(true)
+  })
+
+  it('treats a directory install as local however the path is spelled', () => {
+    expect(isRegistrySourced({ source: '/home/u/apps/orchestrator-switch' })).toBe(false)
+    // A path that merely CONTAINS the word must not read as a registry ref —
+    // only the prefix the gateway writes counts.
+    expect(isRegistrySourced({ source: '/home/u/registry:copy' })).toBe(false)
+    expect(isRegistrySourced({ source: 'C:\\apps\\orchestrator-switch' })).toBe(false)
+  })
+
+  it('falls back to origin for a record written before source was stored', () => {
+    expect(isRegistrySourced({ origin: 'registry' })).toBe(true)
+    expect(isRegistrySourced({ origin: 'local' })).toBe(false)
+    expect(isRegistrySourced({})).toBe(false)
+    // A stored source always wins over origin — it is the value the backend's
+    // own update branch reads.
+    expect(isRegistrySourced({ source: '/srv/app', origin: 'registry' })).toBe(false)
   })
 })
 

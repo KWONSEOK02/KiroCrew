@@ -4577,7 +4577,8 @@
         "uninstall": "আনইনস্টল করুন",
         "update": "আপডেট করুন",
         "update_to": "v{{version}}-এ আপডেট করো",
-        "v": "v"
+        "v": "v",
+        "syncing": "সিঙ্ক হচ্ছে…"
       },
       "sourcesPopover": {
         "developer_install_of_a_local_app_directory_equiv": "একটি লোকাল অ্যাপ ডিরেক্টরির ডেভেলপার ইনস্টল (সমতুল্য:",
@@ -7086,7 +7087,8 @@
       "update_other": "{{count}}টি আপডেট",
       "updating_progress": "আপডেট হচ্ছে {{done}}/{{total}}…",
       "v": "v",
-      "installed_app_find_in_library_and_enable": "{{name}} ইনস্টল হয়েছে। সক্রিয় করতে নিচে এটি চালু করুন।"
+      "installed_app_find_in_library_and_enable": "{{name}} ইনস্টল হয়েছে। সক্রিয় করতে নিচে এটি চালু করুন।",
+      "synced_from_its_source_directory": "{{name}} তার সোর্স ডিরেক্টরি থেকে সিঙ্ক করা হয়েছে।"
     },
     "artifactDeployPage": {
       "0_00_mo": "~$0.00/মাস",

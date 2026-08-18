@@ -4491,7 +4491,8 @@
         "uninstall": "제거",
         "update": "업데이트",
         "update_to": "v{{version}}(으)로 업데이트",
-        "v": "v"
+        "v": "v",
+        "syncing": "동기화 중…"
       },
       "sourcesPopover": {
         "developer_install_of_a_local_app_directory_equiv": "로컬 앱 디렉터리의 개발자 설치 (다음과 동일:",
@@ -6990,7 +6991,8 @@
       "update_other": "업데이트 {{count}}개",
       "updating_progress": "업데이트 중 {{done}}/{{total}}…",
       "v": "v",
-      "installed_app_find_in_library_and_enable": "{{name}} 설치됨. 아래에서 켜서 활성화하세요."
+      "installed_app_find_in_library_and_enable": "{{name}} 설치됨. 아래에서 켜서 활성화하세요.",
+      "synced_from_its_source_directory": "{{name}}을(를) 소스 디렉터리에서 동기화했습니다."
     },
     "artifactDeployPage": {
       "0_00_mo": "~$0.00/월",

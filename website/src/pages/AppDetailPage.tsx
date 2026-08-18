@@ -18,6 +18,7 @@ import { api } from '../api/client'
 import { PageHeader, Card, CardTitle, Badge, Btn } from '../components/ui'
 import AppIcon from '../components/AppIcon'
 import TrustAppModal, { APP_EXECUTION_DENIED, isTrustDeniedError, useTrustGate } from '../components/appstore/TrustAppModal'
+import { isRegistrySourced } from '../components/appstore/types'
 import { recordEvent } from '../rum'
 import { useTheme } from '../hooks/useTheme'
 import AskAgentButton from '../components/AskAgentButton'
@@ -343,6 +344,15 @@ export default function AppDetailPage() {
     autoActionTriggered.current = true
     // Clear the state so a refresh or Back/Forward doesn't re-fire it.
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+    // An installed app whose bytes came from a directory on this machine has no
+    // registry row to install from — its refresh is the update endpoint, which
+    // re-copies the source directory recorded at install. The streaming registry
+    // install is for everything else: a registry-sourced app, and an app not
+    // installed at all.
+    if (stateAction === 'update' && app.installed && !isRegistrySourced(app)) {
+      handleAction('update')
+      return
+    }
     handleInstall()
   }, [app, location]) // eslint-disable-line react-hooks/exhaustive-deps
 

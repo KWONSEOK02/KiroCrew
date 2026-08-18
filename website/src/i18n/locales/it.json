@@ -4647,7 +4647,8 @@
         "uninstall": "Disinstalla",
         "update": "Aggiorna",
         "update_to": "Aggiorna alla v{{version}}",
-        "v": "v"
+        "v": "v",
+        "syncing": "Sincronizzazione…"
       },
       "sourcesPopover": {
         "developer_install_of_a_local_app_directory_equiv": "Installazione da sviluppatore di una directory app locale (equivalente a",
@@ -7182,7 +7183,8 @@
       "update_other": "{{count}} aggiornamenti",
       "updating_progress": "Aggiornamento {{done}}/{{total}}…",
       "v": "v",
-      "installed_app_find_in_library_and_enable": "{{name}} installato. Attivalo qui sotto per abilitarlo."
+      "installed_app_find_in_library_and_enable": "{{name}} installato. Attivalo qui sotto per abilitarlo.",
+      "synced_from_its_source_directory": "{{name}} sincronizzata dalla sua directory di origine."
     },
     "artifactDeployPage": {
       "0_00_mo": "~0,00 $/mese",

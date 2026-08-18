@@ -1119,6 +1119,16 @@ function GovernancePolicyViewer() {
                 <Badge variant="muted"><ListChecks size={11} className="lucide-inline" /> {i18nT('pages.settings.securityPanel.profile')} {data.profile}</Badge>
               )}
             </div>
+            {(data?.fallback_profiles?.length ?? 0) > 0 && (
+              <div className="flex items-start gap-2.5 py-2.5 mt-1 mb-1 rounded-md bg-warn/10 border border-warn/30 px-3">
+                <AlertTriangle size={14} className="lucide-inline text-warn shrink-0 mt-0.5" />
+                <div className="text-[12px] text-text leading-relaxed">
+                  <span className="font-semibold">{i18nT('pages.settings.securityPanel.profile_unusable_title')}</span>
+                  {' '}{i18nT('pages.settings.securityPanel.profile_unusable_body')}
+                  {' '}{i18nT('pages.settings.securityPanel.profile_unusable_which', { profiles: data!.fallback_profiles!.join(', ') })}
+                </div>
+              </div>
+            )}
             {planeRows.map(({ plane, rows }) => rows.length === 0 ? null : (
               <div key={plane.key} className="border-t border-border first:border-t-0 pt-1.5 mt-1.5 first:mt-0 first:pt-0">
                 <div className="flex items-center gap-1.5 py-1">

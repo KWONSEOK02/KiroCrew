@@ -733,6 +733,47 @@ describe('SecurityPanel — governance policy viewer', () => {  beforeEach(() =>
       screen.queryByText(/A surface with its own profile can allow what the host cannot/),
     ).not.toBeInTheDocument()
   })
+
+  it('shows a warning banner naming the unusable profiles', async () => {
+    ;(api.governancePolicy as ReturnType<typeof vi.fn>).mockResolvedValue(
+      govGoverned({ fallback_profiles: ['host'] }),
+    )
+    renderWithProviders(<SecurityPanel />, { route: '/?section=governance' })
+
+    expect(await screen.findByText('Profile could not be loaded')).toBeInTheDocument()
+    expect(screen.getByText(/fail-closed deny-all ceiling/)).toBeInTheDocument()
+    expect(screen.getByText(/Affected: host\./)).toBeInTheDocument()
+  })
+
+  it('names every unusable profile, not just the host one', async () => {
+    // The reason the contract is a list: a broken sibling surface deny-alls
+    // itself just as silently, and a host-only boolean could not report it.
+    ;(api.governancePolicy as ReturnType<typeof vi.fn>).mockResolvedValue(
+      govGoverned({ fallback_profiles: ['cron', 'subagent'] }),
+    )
+    renderWithProviders(<SecurityPanel />, { route: '/?section=governance' })
+
+    expect(await screen.findByText('Profile could not be loaded')).toBeInTheDocument()
+    expect(screen.getByText(/Affected: cron, subagent\./)).toBeInTheDocument()
+  })
+
+  it('does not show fallback banner when fallback_profiles is empty', async () => {
+    ;(api.governancePolicy as ReturnType<typeof vi.fn>).mockResolvedValue(
+      govGoverned({ fallback_profiles: [] }),
+    )
+    renderWithProviders(<SecurityPanel />, { route: '/?section=governance' })
+
+    await screen.findByText('Policy v1')
+    expect(screen.queryByText('Profile could not be loaded')).not.toBeInTheDocument()
+  })
+
+  it('does not show fallback banner when fallback_profiles is absent', async () => {
+    ;(api.governancePolicy as ReturnType<typeof vi.fn>).mockResolvedValue(govGoverned())
+    renderWithProviders(<SecurityPanel />, { route: '/?section=governance' })
+
+    await screen.findByText('Policy v1')
+    expect(screen.queryByText('Profile could not be loaded')).not.toBeInTheDocument()
+  })
 })
 
 describe('SecurityPanel — posture disclosure', () => {

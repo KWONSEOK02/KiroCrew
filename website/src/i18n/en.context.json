@@ -210,6 +210,7 @@
     "apps.designCritique.scopingPicker.pick_at_least_one_screen": "Disabled label of the scoping step's start button, shown while the user has picked nothing yet. It says what to do next, not what the button does.",
     "components.gitPanel.title": "Title of the Git side panel showing the project repository state (branch, uncommitted changes, recent commits). \"Git\" is the version-control tool's proper name - do not translate.",
     "hooks.usePanelTabs.git": "Tab label for the Git side-panel view in the chat right panel. \"Git\" is the version-control tool's proper name - do not translate.",
-    "pages.chat.sidePanel.menu_git": "Menu entry in the side panel \"+\" menu that opens the Git view. \"Git\" is the version-control tool's proper name - do not translate."
+    "pages.chat.sidePanel.menu_git": "Menu entry in the side panel \"+\" menu that opens the Git view. \"Git\" is the version-control tool's proper name - do not translate.",
+    "pages.settings.variablesPanel.add": "Button on the Settings > Environment Variables panel that appends a new empty variable row to the table. Imperative verb, not the noun 'addition'; width-constrained, so keep it to one short word."
   }
 }

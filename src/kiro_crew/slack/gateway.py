@@ -3718,7 +3718,7 @@ class GatewayOrchestrator:
             if self.autonudge_svc:
                 await self.autonudge_svc.remove(loop.id)
             return False
-        msg_body = render_nudge_message(loop.message, loop.stop_sentinel_path)
+        msg_body = render_nudge_message(loop.message, loop.stop_sentinel_path, loop.agent)
         tagged = f"[auto-nudge cycle {loop.cycle_count + 1}]\n{msg_body}"
         # Fail closed: an unattended turn MUST run under the HookManager
         # PreToolUse governance gate (mirrors cron's default approval path).
@@ -3899,7 +3899,7 @@ class GatewayOrchestrator:
         if sessions is not None and sessions.is_busy(key):
             logger.info("AutoNudge skip: discord session %s busy (loop %s)", key, loop.id)
             return False
-        msg_body = render_nudge_message(loop.message, loop.stop_sentinel_path)
+        msg_body = render_nudge_message(loop.message, loop.stop_sentinel_path, loop.agent)
         tagged = f"[auto-nudge cycle {loop.cycle_count + 1}]\n{msg_body}"
         try:
             conversation_id = await transport.resolve_conversation(user_id)
@@ -3990,7 +3990,7 @@ class GatewayOrchestrator:
                 loop.slot_key,
                 loop.id,
             )
-        msg = render_nudge_message(loop.message, loop.stop_sentinel_path)
+        msg = render_nudge_message(loop.message, loop.stop_sentinel_path, loop.agent)
         tagged = f"[auto-nudge cycle {loop.cycle_count + 1}]\n{msg}"
         from kiro_crew.dashboard.chat import (
             _run_chat,  # circular import: gateway -> dashboard.chat -> gateway (chat dispatch references GatewayOrchestrator)

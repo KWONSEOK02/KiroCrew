@@ -30,6 +30,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Optional
 
+from kiro_crew.config.loader import variable_values_for
 from kiro_crew.executors import run_in_embed_pool
 from kiro_crew.hooks import TOOL_AUTO_APPROVE, TOOL_DENY
 from kiro_crew.messaging.driver import TurnDriver
@@ -37,6 +38,7 @@ from kiro_crew.messaging.identity import channel_inbound_permitted, publish_turn
 from kiro_crew.messaging.link import channel_namespace_of, is_channel_session_key
 from kiro_crew.messaging.renderer import SilentRenderer
 from kiro_crew.sel import sel
+from kiro_crew.variables import expand as expand_variables
 
 logger = logging.getLogger(__name__)
 
@@ -241,16 +243,25 @@ async def drive_turn(turn: ChannelTurn, *, sessions: Any, ctx_builder: Any) -> N
         # Publish this turn's session identity so managed MCP tools resolve
         # X-Session-Key; one shared writer lives in messaging.identity.
         await publish_turn_identity(sessions, session_key)
+        # Crew variables in the user's own inbound text. A channel message is
+        # authored the same way a dashboard message is; the imported surfaces
+        # (skill bodies, prompt files, steering) are assembled inside
+        # build_message and never reach this argument.
+        _vars = variable_values_for(turn.agent)
+        _user_text = expand_variables(turn.user_text, _vars)[0] if _vars else turn.user_text
         # Off-loop: build_message embeds the episodic query (blocking urllib).
         full_message, _ = await run_in_embed_pool(
             ctx_builder.build_message,
-            turn.user_text,
+            _user_text,
             is_new,
             session_key,
             channel_id=turn.conversation_id,
             agent=turn.agent,
             resumed=resumed,
             runtime_source=turn.channel_type,
+            # Skill triggers match the message as the user sent it, not as
+            # variable expansion rewrote it.
+            trigger_text=turn.user_text,
         )
 
         driver = TurnDriver(

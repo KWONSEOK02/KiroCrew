@@ -47,6 +47,7 @@ from kiro_crew.config.loader import (
     data_home,
     normalize_agent_model,
     resolve_agent_bindings,
+    resolve_variables,
 )
 from kiro_crew.connections import get_visible_providers
 from kiro_crew.context_blocks import (
@@ -209,6 +210,7 @@ from kiro_crew.session import SessionClosingError, SpeculativeResumeRefused
 from kiro_crew.slack.handler import post_linked_approval, resolve_linked_approval
 from kiro_crew.slack.outbound import PostedOptions
 from kiro_crew.validation import ValidationError, infer_use_case, validate_ask_user_question
+from kiro_crew.variables import expand as expand_variables
 from kiro_crew.widget_artifacts import register_widgets_off_loop
 
 logger = logging.getLogger(__name__)
@@ -2776,9 +2778,74 @@ def _expand_prompt_mention(
     ``(original_message, "blocked")`` if blocked by sensitive-path check,
     ``(original_message, "too_large")`` if file exceeds size limit, or
     ``(original_message, "not_found")`` if no match.
+
+    Thin wrapper over :func:`_resolve_prompt_mention` for callers that want one
+    string. The turn pipeline uses the parts form instead, because the prompt body
+    is IMPORTED text that must not go through variable expansion while the user's
+    trailing text must.
+    """
+    authored, blocks, status = _resolve_prompt_mention(message, state, slot)
+    if status != "ok":
+        return message, status
+    return _join_prompt_parts(authored, blocks), status
+
+
+def _expand_message_variables(
+    message: str,
+    state: DashboardState,
+    slot: _ChatSlot,
+) -> str:
+    """Substitute the session's crew variables in the user's own text.
+
+    Resolution failure is not fatal: an unreadable or malformed config leaves the
+    turn unexpanded rather than refusing it, since a variable is a convenience and
+    the message is still what the user meant to send.
+
+    An unresolved name is surfaced once per message and left literal in the text.
+    Blanking it would silently change the instruction the agent acts on.
+    """
+    if "{{" not in message:
+        return message
+    try:
+        values = resolve_variables(KiroCrewConfig.load(), slot.agent or None).values
+    except Exception:
+        logger.debug("crew-variable resolution failed; message left unexpanded", exc_info=True)
+        return message
+    if not values:
+        return message
+    expanded, unresolved = expand_variables(message, values)
+    if unresolved:
+        names = ", ".join(sorted(unresolved))
+        slot.append(
+            "system",
+            f"Undefined variable(s) left as written: {names}",
+            "msg msg-info",
+        )
+        state.push_slots_update()
+    return expanded
+
+
+def _join_prompt_parts(authored: str, blocks: list[str]) -> str:
+    """Assemble an @prompt turn: imported body first, the user's own text after."""
+    expanded = blocks[0]
+    if authored:
+        expanded += f"\n\n---\nAdditional context from user: {authored}"
+    return expanded
+
+
+def _resolve_prompt_mention(
+    message: str,
+    state: DashboardState,
+    slot: _ChatSlot,
+) -> tuple[str, list[str], str]:
+    """Resolve ``@prompt-name rest`` WITHOUT assembling the two halves.
+
+    Returns ``(authored_text, imported_blocks, status)``. On any non-``ok`` status
+    the message is returned unchanged with no blocks, so a caller that binds the
+    first element sees exactly what the single-string form used to give it.
     """
     if not message.startswith("@"):
-        return message, "not_found"
+        return message, [], "not_found"
 
     # Parse @name from start of message — name ends at first whitespace or EOL
     body = message[1:]  # strip leading @
@@ -2789,17 +2856,17 @@ def _expand_prompt_mention(
     try:
         match = _find_prompt(mention)
     except Exception:
-        return message, "not_found"
+        return message, [], "not_found"
     if not match:
-        return message, "not_found"
+        return message, [], "not_found"
 
     if is_sensitive_path(match["path"]):
-        return message, "blocked"
+        return message, [], "blocked"
 
     try:
         raw = Path(match["path"]).read_bytes()
     except OSError:
-        return message, "not_found"
+        return message, [], "not_found"
     if len(raw) > MAX_PROMPT_BYTES:
         logger.warning(
             "Prompt %s exceeds max size (%d > %d bytes)",
@@ -2807,16 +2874,15 @@ def _expand_prompt_mention(
             len(raw),
             MAX_PROMPT_BYTES,
         )
-        return message, "too_large"
+        return message, [], "too_large"
     content = raw.decode("utf-8", errors="replace")
 
     content, _ = redact_credentials(content)
     content, _ = redact_exfiltration_urls(content)
 
-    # Inject SOP as instructions the agent must follow
-    expanded = f"Execute the following instructions:\n\n{content}"
-    if user_text:
-        expanded += f"\n\n---\nAdditional context from user: {user_text}"
+    # The SOP is instructions the agent must follow. Kept SEPARATE from the
+    # user's trailing text so the caller can transform one and not the other.
+    imported = f"Execute the following instructions:\n\n{content}"
 
     # Show the user what happened
     slot.append(
@@ -2826,7 +2892,7 @@ def _expand_prompt_mention(
     )
     state.push_slots_update()
 
-    return expanded, "ok"
+    return user_text, [imported], "ok"
 
 
 def _expand_dollar_skills(
@@ -2835,6 +2901,28 @@ def _expand_dollar_skills(
     slot: _ChatSlot,
     session_key: str,
 ) -> tuple[str, int]:
+    """Thin wrapper over :func:`_resolve_dollar_skills` returning one string.
+
+    The turn pipeline uses the parts form: a skill body is IMPORTED text, and a
+    skill installed from the public registry must not receive variable values.
+    """
+    authored, blocks, count = _resolve_dollar_skills(message, state, slot, session_key)
+    return _join_skill_parts(authored, blocks), count
+
+
+def _join_skill_parts(authored: str, blocks: list[str]) -> str:
+    """Assemble a ``$skill`` turn: the user's own text, then each skill body."""
+    if not blocks:
+        return authored
+    return authored + "\n\n" + "\n\n---\n\n".join(blocks)
+
+
+def _resolve_dollar_skills(
+    message: str,
+    state: DashboardState,
+    slot: _ChatSlot,
+    session_key: str,
+) -> tuple[str, list[str], int]:
     """Expand ``$skillname`` tokens anywhere in *message* into appended skill bodies.
 
     Leaves the literal ``$token`` in place (decision (a)) and appends a
@@ -2851,7 +2939,7 @@ def _expand_dollar_skills(
     appended (0 if none resolved).
     """
     if "$" not in message:
-        return message, 0
+        return message, [], 0
     skills = _get_skills(state)
     try:
         resolved = skills.resolve_dollar_skills(message)
@@ -2869,7 +2957,7 @@ def _expand_dollar_skills(
             outcome="error",
             metadata={"reason": "exception", "slot": slot.key},
         )
-        return message, 0
+        return message, [], 0
     if not resolved:
         if skills.has_dollar_candidate(message):
             sel().log_tool_invocation(
@@ -2881,7 +2969,7 @@ def _expand_dollar_skills(
                 outcome="not_found",
                 metadata={"slot": slot.key},
             )
-        return message, 0
+        return message, [], 0
 
     blocks: list[str] = []
     names: list[str] = []
@@ -2891,15 +2979,13 @@ def _expand_dollar_skills(
         blocks.append(f"[Skill: {name}]\n\n{body}")
         names.append(name)
 
-    expanded = message + "\n\n" + "\n\n---\n\n".join(blocks)
-
     slot.append(
         "system",
         f"📎 Loaded skill(s) via `$`: **{', '.join(names)}**",
         "msg msg-info",
     )
     state.push_slots_update()
-    return expanded, len(names)
+    return message, blocks, len(names)
 
 
 def _should_suppress_requeue(slot) -> bool:
@@ -4378,10 +4464,19 @@ async def _run_chat(
         # neutralization, the multibyte fold, a rewriting hook) are NOT applied
         # here — build_message maps these bounds to their final position itself.
         user_typed_len = len(message)
+        # The text as typed, kept for skill-trigger matching: @prompt
+        # replaces `message`, $skill appends to it and variable expansion
+        # rewrites it, so by assembly time it no longer reflects what the
+        # user actually asked for.
+        pre_expansion_message = message
         prompt_expanded = False
+        # Imported bodies are held aside and joined back after variable expansion,
+        # so a prompt file or skill body never receives a variable value.
+        prompt_blocks: list[str] = []
+        skill_blocks: list[str] = []
         if message.startswith("@") and not is_slash and _prompt_depth < 1:
             original = message
-            message, _status = _expand_prompt_mention(message, state, slot)
+            message, prompt_blocks, _status = _resolve_prompt_mention(message, state, slot)
             if _status == "ok":
                 prompt_expanded = True
                 sel().log_tool_invocation(
@@ -4431,7 +4526,9 @@ async def _run_chat(
         # Skipped for slash commands; _prompt_depth<1 blocks the recursive _run_chat
         # path. Token is left literal; resolved bodies are appended.
         if "$" in message and not is_slash and not prompt_expanded and _prompt_depth < 1:
-            message, _n_skills = _expand_dollar_skills(message, state, slot, session_key)
+            message, skill_blocks, _n_skills = _resolve_dollar_skills(
+                message, state, slot, session_key
+            )
             if _n_skills:
                 sel().log_tool_invocation(
                     session_key=session_key,
@@ -4442,6 +4539,20 @@ async def _run_chat(
                     outcome="ok",
                     metadata={"count": str(_n_skills), "slot": slot.key},
                 )
+
+        # ── {{variable}} expansion ──
+        # LAST of the text stages and over the user's own text ONLY. Both resolvers
+        # above already ran against the pre-expansion text, so a variable value
+        # cannot load a skill or inline a prompt file; and the imported bodies are
+        # joined in below, after expansion, so a registry-installed skill cannot
+        # receive a variable value. Both properties are structural here rather than
+        # enforced by sanitizing values.
+        if not is_slash:
+            message = _expand_message_variables(message, state, slot)
+        if prompt_blocks:
+            message = _join_prompt_parts(message, prompt_blocks)
+        if skill_blocks:
+            message = _join_skill_parts(message, skill_blocks)
 
         # Ensure the mirror-source message is always bound before both the Slack
         # and channel-neutral user-message mirror legs run. The assignment that
@@ -4648,6 +4759,7 @@ async def _run_chat(
                 message,
                 is_new,
                 session_key,
+                trigger_text=pre_expansion_message,
                 agent=kiro_agent or slot.agent or None,
                 resumed=resumed,
                 workspace=slot.workspace or None,

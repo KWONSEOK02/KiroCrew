@@ -1685,8 +1685,15 @@ class ConversationLog:
         #: staleness (an append bumps the file mtime, so the entry is
         #: recomputed on the next call). Own ``_LRUCache`` → own internal lock.
         self._recent_cache: _LRUCache[tuple[float, list[dict]]] = _LRUCache(cache_max)
-        #: Bounded, mtime-keyed memo of ``(mtime, doc_chars, casefolded_blob)``
-        #: per session, consumed only by :meth:`search_sessions`.
+        #: Bounded memo of ``(mtime, gen, doc_chars, casefolded_blob)`` per
+        #: session, consumed only by :meth:`search_sessions`. ``gen`` is the
+        #: invalidation generation (:meth:`_cache_gen`) the entry was folded
+        #: under; a hit requires BOTH the mtime and the generation to match,
+        #: because ``_invalidate_cache``'s pops reach only their own
+        #: instance's caches while a preserved-mtime rewrite can be performed
+        #: through a different ``ConversationLog`` instance over the same
+        #: directory — the generation bump is what unhits such an entry where
+        #: the instance-local pop cannot.
         #:
         #: Folding is the dominant cost of a search: the substring count itself
         #: is cheap, but ``str.casefold`` over a whole corpus is not, and it
@@ -1701,10 +1708,10 @@ class ConversationLog:
         #: order; :class:`_SearchTextCache` keeps that guarantee by refusing
         #: admission instead of evicting, so the sessions that fit stay cached
         #: and the bound is now a real memory ceiling rather than a proxy for one.
-        self._folded_cache: _SearchTextCache[tuple[float, int, str]] = _SearchTextCache(
-            _SEARCH_FOLD_BUDGET_BYTES, lambda v: v[2].__sizeof__(), "fold"
+        self._folded_cache: _SearchTextCache[tuple[float, int, int, str]] = _SearchTextCache(
+            _SEARCH_FOLD_BUDGET_BYTES, lambda v: v[3].__sizeof__(), "fold"
         )
-        #: session key → (mtime, raw message texts) for snippet extraction.
+        #: session key → (mtime, gen, raw message texts) for snippet extraction.
         #:
         #: The fold above answers "does this session match"; this answers "show me
         #: the line". Without it every returned row re-opened its file and
@@ -1717,10 +1724,13 @@ class ConversationLog:
         #: Filled by :meth:`_build_folded`, which already materializes exactly
         #: this list to build the fold — so the second corpus costs one extra
         #: reference, never an extra read. Raw (not folded) because the snippet is
-        #: displayed to the user; the fold cannot be reused for it.
-        self._snippet_cache: _SearchTextCache[tuple[float, list[str]]] = _SearchTextCache(
+        #: displayed to the user; the fold cannot be reused for it. Carries the
+        #: same generation field as ``_folded_cache`` above, for the same
+        #: cross-instance reason: both memos are derived from the messages, so
+        #: they go stale at exactly the same moment.
+        self._snippet_cache: _SearchTextCache[tuple[float, int, list[str]]] = _SearchTextCache(
             _SEARCH_SNIPPET_BUDGET_BYTES,
-            lambda v: v[1].__sizeof__() + sum(t.__sizeof__() for t in v[1]),
+            lambda v: v[2].__sizeof__() + sum(t.__sizeof__() for t in v[2]),
             "snippet",
         )
         #: tab_id → [session keys] chain index. ``None`` means "stale, rebuild
@@ -2570,7 +2580,15 @@ class ConversationLog:
             # (see _restore_mtime). Otherwise consolidation floats stale sessions
             # to the top of list_sessions on every gateway restart.
             _restore_mtime(path, prev_mtime)
-        self._invalidate_cache(key)
+            # Invalidate while still holding the lock. Outside it there is a
+            # window where the file is already rewritten with its mtime
+            # restored but the generation has not moved, so a concurrent fold /
+            # snippet / metadata read passes both the mtime and the generation
+            # guard and memoizes pre-rewrite data. Every other preserved-mtime
+            # writer already invalidates inside its locked section;
+            # _invalidate_cache is pure in-memory work, so this adds no I/O
+            # under the cross-process flock.
+            self._invalidate_cache(key)
 
     def unconsolidated_count(self, key: str) -> int:
         """Count messages not yet processed by the consolidator."""
@@ -3168,7 +3186,8 @@ class ConversationLog:
         return out
 
     def _folded_content(self, key: str) -> tuple[int, str]:
-        """Return ``(doc_chars, casefolded_content)`` for *key*, memoized by mtime.
+        """Return ``(doc_chars, casefolded_content)`` for *key*, memoized by
+        mtime plus invalidation generation.
 
         ``doc_chars`` counts the ORIGINAL (unfolded) characters, because it
         feeds the length normalizer in :meth:`search_sessions` and folding can
@@ -3190,8 +3209,11 @@ class ConversationLog:
             self._snippet_cache.pop(key, None)
             return (0, "")
         cached = self._folded_cache.get(key)
-        if cached and cached[0] == mtime:
-            return (cached[1], cached[2])
+        # The hit wants the LATEST generation (a moved counter means a write
+        # landed, so a miss is the correct answer), so it is read at check
+        # time rather than snapshotted earlier — matching ``_snippet_texts``.
+        if cached and cached[0] == mtime and cached[1] == self._cache_gen(key):
+            return (cached[2], cached[3])
         # Cold: serialize against this key's writers for the whole
         # stat -> read -> store sequence.
         #
@@ -3203,12 +3225,27 @@ class ConversationLog:
         # has — undetectable, so the newly saved messages would be missing from
         # every later search for the life of the process.
         #
-        # ``_file_lock`` is the same in-process RLock every writer takes first in
-        # ``_locked``, so holding it here orders this fold against append /
-        # rewrite / metadata edits for this key. It is acquired ONLY on the miss
-        # path: a warm search never contends, and two threads racing the same
-        # cold key fold once (the re-check below).
+        # ``_file_lock`` is the same process-wide, path-keyed RLock every writer
+        # takes first in ``_locked`` — shared across every ``ConversationLog``
+        # instance over this file — so holding it here orders this fold against
+        # append / rewrite / metadata edits for this key, whichever instance
+        # performs them. It is acquired ONLY on the miss path: a warm search
+        # never contends, and two threads racing the same cold key fold once
+        # (the re-check below). What the lock CANNOT fix is invalidation reach:
+        # a writer's ``_invalidate_cache`` pops only its own instance's caches,
+        # so an entry already sitting warm in THIS instance survives a rewrite
+        # performed through a different instance, mtime restored and all. That
+        # is why entries carry the generation and the warm-hit checks above and
+        # below require it to match.
         with self._file_lock(key):
+            # Snapshot the fill baseline under the lock and BEFORE the stat:
+            # the mtime that stat returns can survive a housekeeping rewrite
+            # (``_restore_mtime``), so only an unmoved generation can prove the
+            # stat → read → publish window stayed write-free. A writer that ran
+            # between the lock-free probe and the acquire already bumped the
+            # counter, and the fold below is ordered AFTER it, so its result is
+            # current for this newer generation.
+            gen = self._cache_gen(key)
             try:
                 mtime = path.stat().st_mtime
             except OSError:
@@ -3216,9 +3253,9 @@ class ConversationLog:
                 self._snippet_cache.pop(key, None)
                 return (0, "")
             cached = self._folded_cache.get(key)
-            if cached and cached[0] == mtime:
-                return (cached[1], cached[2])
-            built = self._build_folded(key, mtime)
+            if cached and cached[0] == mtime and cached[1] == self._cache_gen(key):
+                return (cached[2], cached[3])
+            built = self._build_folded(key, mtime, gen)
             if built is None:
                 # The read failed rather than finding no content. Caching that
                 # would be keyed by an mtime the file still has, so a session
@@ -3228,7 +3265,9 @@ class ConversationLog:
                 # unsearchable until something wrote to it again. Fail open:
                 # report empty for this query and retry on the next one.
                 return (0, "")
-            self._folded_cache[key] = (mtime, built[0], built[1])
+            self._publish_if_current(
+                self._folded_cache, key, (mtime, gen, built[0], built[1]), key=key, gen=gen
+            )
             return built
 
     def _prune_search_memos(self, live_keys: set[str]) -> None:
@@ -3251,7 +3290,7 @@ class ConversationLog:
             if cache.refused_since_prune():
                 cache.retain(live_keys)
 
-    def _build_folded(self, key: str, mtime: float) -> tuple[int, str] | None:
+    def _build_folded(self, key: str, mtime: float, gen: int) -> tuple[int, str] | None:
         """Parse *key* and fold its content — the cache-miss half of
         :meth:`_folded_content`.
 
@@ -3275,11 +3314,19 @@ class ConversationLog:
         the file makes the fold a function of the file alone.
 
         The caller holds ``_file_lock``, which orders this read against writers
-        in THIS process. A writer in another process holds only the cross-process
-        flock, so it can still interleave — but the caller stats BEFORE this read,
-        so such a write leaves the cached mtime older than the file's and the next
-        access re-folds. That case is self-healing, unlike the preserved-mtime
-        rewrite the lock exists for.
+        in THIS process — the lock table is class-level and path-keyed, so that
+        includes writers using other ``ConversationLog`` instances. A writer in
+        another process holds only the cross-process flock, so it can still
+        interleave; if it bumps the mtime, the caller's pre-read stat leaves the
+        cached mtime older than the file's and the next access re-folds. A
+        cross-process PRESERVED-mtime rewrite, however, is caught by neither
+        the lock nor the generation (the counter lives in this process) — a
+        known residual gap shared with every memo in this class. *gen* is the
+        invalidation-generation snapshot the caller took alongside its stat;
+        the snippet store below publishes under it and records it in the entry,
+        which is what lets a warm hit notice an in-process rewrite performed
+        through a different instance (whose ``_invalidate_cache`` pops only its
+        own instance's caches).
 
         Separated from :meth:`_folded_content` so the memoization is observable:
         a caller (or a test) can count how often the expensive fold actually
@@ -3293,10 +3340,15 @@ class ConversationLog:
         if not texts:
             return (0, "")
         # Hand the same list to the snippet memo. The caller has already stat'ed
-        # under ``_file_lock`` and passes that mtime, so both memos are keyed by
-        # one observation of the file and cannot disagree about which revision
-        # they hold. Storing here is why the second corpus costs no extra read.
-        self._snippet_cache[key] = (mtime, texts)
+        # under ``_file_lock`` and passes that mtime and its generation
+        # snapshot, so both memos are keyed by one observation of the file and
+        # cannot disagree about which revision they hold. Storing here is why
+        # the second corpus costs no extra read. The publish guard here is
+        # generation-stamp hygiene: the lock already orders this store against
+        # in-process writers, so its job is refusing to stamp an entry with an
+        # already-superseded generation — the recorded generation is what the
+        # warm-hit checks compare against.
+        self._publish_if_current(self._snippet_cache, key, (mtime, gen, texts), key=key, gen=gen)
         return (sum(len(t) for t in texts), "\x00".join(texts).casefold())
 
     def _iter_message_texts(self, key: str) -> Iterator[str]:
@@ -3340,25 +3392,31 @@ class ConversationLog:
         Prefers ``_snippet_cache`` — filled by :meth:`_build_folded` from the same
         read that produced the fold — and falls back to re-reading the file.
 
-        The memo is validated against the file's current mtime, so it degrades to
-        the file read rather than serving a stale snippet. That check is cheap
-        relative to the parse it avoids, and unlike the fold this path does NOT
-        need ``_file_lock``: a snippet is display-only, so the worst case for a
-        preserved-mtime rewrite racing here is one stale preview line, not a
-        session that stops matching. The fold — which decides whether a row
-        appears at all — keeps the lock.
+        The memo is validated against the file's current mtime AND the current
+        invalidation generation (:meth:`_cache_gen`), so it degrades to the
+        file read rather than serving a stale snippet. The mtime alone cannot
+        catch a preserved-mtime rewrite performed through a DIFFERENT
+        ``ConversationLog`` instance (its ``_invalidate_cache`` pops only its
+        own instance's caches); the generation clause is what unhits such an
+        entry. Both checks are cheap relative to the parse they avoid, and
+        unlike the fold this path does NOT need ``_file_lock``: a snippet is
+        display-only, so the worst case for a preserved-mtime rewrite racing
+        here is one stale preview line, not a session that stops matching. The
+        fold — which decides whether a row appears at all — keeps the lock.
 
-        Falls back for three reasons, all of which must stay non-fatal: the entry
+        Falls back for four reasons, all of which must stay non-fatal: the entry
         was refused admission by the byte budget, the fold cached ``(0, "")`` for
-        a session with no text and so stored nothing, or the file changed since
-        the fold. Propagates ``OSError`` from the fallback read, which
+        a session with no text and so stored nothing, the file changed since
+        the fold, or the entry's generation was superseded by a write.
+        Propagates ``OSError`` from the fallback read, which
         :meth:`_content_snippet` already treats as "no snippet".
         """
         cached = self._snippet_cache.get(key)
         if cached is not None:
             try:
-                if cached[0] == self._path(key).stat().st_mtime:
-                    return iter(cached[1])
+                mtime_now = self._path(key).stat().st_mtime
+                if cached[0] == mtime_now and cached[1] == self._cache_gen(key):
+                    return iter(cached[2])
             except OSError:
                 # Let the fallback read raise the OSError the caller handles,
                 # rather than deciding here what a vanished file means.
@@ -3788,7 +3846,12 @@ class ConversationLog:
             lines[0] = json.dumps(meta) + "\n"
             atomic_write(path, "".join(lines), fsync=False)
             _restore_mtime(path, prev_mtime)
-        self._invalidate_cache(key)
+            # Invalidate while still holding the lock — same reasoning as
+            # mark_consolidated: outside it there is a window where the file
+            # is rewritten with its mtime restored but the generation has not
+            # moved, so a concurrent metadata read passes both guards and
+            # memoizes the pre-rewrite view.
+            self._invalidate_cache(key)
 
     def _read_messages(self, key: str) -> list[dict]:
         """Read all non-metadata entries from a session JSONL file.
@@ -4325,7 +4388,7 @@ class ConversationLog:
 
     def _publish_if_current(
         self,
-        cache: _LRUCache[_V],
+        cache: _LRUCache[_V] | _SearchTextCache[_V],
         entry_key: str,
         value: _V,
         *,

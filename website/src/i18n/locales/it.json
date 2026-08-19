@@ -4307,6 +4307,25 @@
         "select_a_run_to_see_its_phases_agents_and_result": "Seleziona un'esecuzione per vederne le fasi, gli agenti e il risultato.",
         "unknown": "Sconosciuto"
       }
+    },
+    "commandBar": {
+      "no_sessions": "Nessuna sessione corrispondente",
+      "title": "Barra dei comandi",
+      "placeholder": "Digita un comando…",
+      "placeholder_sessions": "Cerca in tutte le sessioni…",
+      "no_matches": "Nessun comando corrispondente",
+      "searching": "Ricerca…",
+      "keep_typing": "Digita almeno {{min}} caratteri",
+      "fallback_sessions": "Cerca «{{query}}» nelle sessioni",
+      "cmd_search_sessions": "Cerca sessioni",
+      "group_commands": "Comandi",
+      "group_apps": "App",
+      "group_quicklinks": "Collegamenti rapidi",
+      "group_settings": "Impostazioni",
+      "manifest": {
+        "display_name": "Barra dei comandi",
+        "description": "Digita un comando, non una ricerca. Un launcher per ciò che fai davvero: prima i comandi delle app, i collegamenti rapidi e le impostazioni; le ricerche pesanti si caricano solo quando le apri."
+      }
     }
   },
   "autoImprovement": {

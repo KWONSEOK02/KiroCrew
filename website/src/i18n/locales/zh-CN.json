@@ -4179,6 +4179,25 @@
         "select_a_run_to_see_its_phases_agents_and_result": "选择一次运行以查看其阶段、代理和结果。",
         "unknown": "未知"
       }
+    },
+    "commandBar": {
+      "no_sessions": "没有匹配会话",
+      "title": "命令栏",
+      "placeholder": "输入命令…",
+      "placeholder_sessions": "搜索全部会话…",
+      "no_matches": "没有匹配命令",
+      "searching": "搜索中…",
+      "keep_typing": "至少输入 {{min}} 个字符",
+      "fallback_sessions": "在会话中搜索“{{query}}”",
+      "cmd_search_sessions": "搜索会话",
+      "group_commands": "命令",
+      "group_apps": "应用",
+      "group_quicklinks": "快捷入口",
+      "group_settings": "设置",
+      "manifest": {
+        "display_name": "命令栏",
+        "description": "输入命令，而不是搜索词。它先列出你真正会做的事——应用命令、快捷入口和设置；较重的搜索只在你进入之后才加载。"
+      }
     }
   },
   "autoImprovement": {

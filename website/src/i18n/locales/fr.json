@@ -826,6 +826,25 @@
         "start_a_new_one_several_can_run_at_once": "Lances-en une nouvelle — plusieurs peuvent tourner en même temps."
       }
     },
+    "commandBar": {
+      "no_sessions": "Aucune session correspondante",
+      "title": "Barre de commandes",
+      "placeholder": "Saisissez une commande…",
+      "placeholder_sessions": "Rechercher dans toutes les sessions…",
+      "no_matches": "Aucune commande correspondante",
+      "searching": "Recherche…",
+      "keep_typing": "Saisissez au moins {{min}} caractères",
+      "fallback_sessions": "Rechercher « {{query}} » dans les sessions",
+      "cmd_search_sessions": "Rechercher des sessions",
+      "group_commands": "Commandes",
+      "group_apps": "Applications",
+      "group_quicklinks": "Liens rapides",
+      "group_settings": "Paramètres",
+      "manifest": {
+        "display_name": "Barre de commandes",
+        "description": "Saisissez une commande, pas une requête. Un lanceur pour ce que vous faites vraiment : d’abord les commandes d’applications, les liens rapides et les paramètres ; les recherches lourdes ne se chargent qu’à l’ouverture."
+      }
+    },
     "crewCompanion": {
       "accessory": {
         "coffee": "Café",

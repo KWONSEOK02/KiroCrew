@@ -4307,6 +4307,25 @@
         "select_a_run_to_see_its_phases_agents_and_result": "Selecione uma execução para ver suas fases, agentes e resultado.",
         "unknown": "Desconhecido"
       }
+    },
+    "commandBar": {
+      "no_sessions": "Nenhuma sessão corresponde",
+      "title": "Barra de comandos",
+      "placeholder": "Digite um comando…",
+      "placeholder_sessions": "Pesquisar em todas as sessões…",
+      "no_matches": "Nenhum comando corresponde",
+      "searching": "Pesquisando…",
+      "keep_typing": "Digite ao menos {{min}} caracteres",
+      "fallback_sessions": "Pesquisar “{{query}}” nas sessões",
+      "cmd_search_sessions": "Pesquisar sessões",
+      "group_commands": "Comandos",
+      "group_apps": "Aplicativos",
+      "group_quicklinks": "Links rápidos",
+      "group_settings": "Configurações",
+      "manifest": {
+        "display_name": "Barra de comandos",
+        "description": "Digite um comando, não uma busca. Um lançador para o que você realmente faz: primeiro comandos de aplicativos, links rápidos e configurações; buscas pesadas carregam somente ao entrar nelas."
+      }
     }
   },
   "autoImprovement": {

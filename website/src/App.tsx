@@ -102,7 +102,7 @@ import { useCommandPalette } from './hooks/useCommandPalette'
 import { useProvider } from './providers/context'
 import { useAgents } from './hooks/useAgents'
 import ShortcutsModal from './components/ShortcutsModal'
-import CommandPalette from './components/CommandPalette'
+import QuickSearchSurface from './components/QuickSearchSurface'
 import ReportProblemModal from './components/ReportProblemModal'
 import FeedbackPill from './components/FeedbackPill'
 import KiroAccountModal, { type KiroAccountUsage } from './components/KiroAccountModal'
@@ -110,6 +110,7 @@ import WindowsTitlebarMenu from './components/WindowsTitlebarMenu'
 
 import { i18nT } from './i18n/t'
 import { appNavTarget } from './appNav'
+import { resolveSlotOverlays, type SlotOwners } from './apps/overlaySlots'
 import { fmtCompact, fmtPercent } from './i18n/format'
 
 const MAX_KIRO_BONUS_GRANT_NAME_CHARS = 100
@@ -130,6 +131,7 @@ interface AppListEntry {
     ui?: {
       entry?: string
       pages?: Array<{ route: string; icon?: string; iconUrl?: string; label?: string }>
+      overlays?: Array<{ id?: string; label?: string; replaces?: string }>
     }
   }
 }
@@ -1199,6 +1201,8 @@ export default function App() {
   // lingers. Mirrors ChatSidebar's handleSidebarDragCancel.
   const handleAppDragCancel = useCallback(() => setActiveAppDragId(null), [])
   const appNavRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [slotOwners, setSlotOwners] = useState<SlotOwners>({})
+  const queryClient = useQueryClient()
   const refreshAppNav = useCallback((attempt = 0) => {
     // Cancel any pending retry up-front so external triggers (the reconnect
     // effect, the mc:apps-changed handler) or a just-fired retry can never run
@@ -1245,6 +1249,14 @@ export default function App() {
           })
         setAppNavItems(items)
         dispatch(setEnabledAppIds(items.map(i => i.id)))
+        // Publish this response under the shared apps key so readers that want the
+        // list -- an overlay opened later, the palette's apps provider -- are served
+        // from cache instead of issuing a second identical request.
+        queryClient.setQueryData(['apps'], apps)
+        // Which app (if any) currently owns a host overlay slot. Derived from the
+        // SAME response as the nav rail — an app-contributed overlay costs no
+        // extra request, and the shell never names a specific app.
+        setSlotOwners(resolveSlotOverlays(apps))
       })
       .catch(() => {
         // A transient failure (e.g. the gateway mid-restart right after a
@@ -1255,7 +1267,7 @@ export default function App() {
         if (attempt >= APP_NAV_MAX_RETRIES) return
         appNavRetryRef.current = setTimeout(() => refreshAppNav(attempt + 1), APP_NAV_RETRY_BASE_MS * 2 ** attempt)
       })
-  }, [dispatch])
+  }, [dispatch, queryClient])
   useEffect(() => {
     refreshAppNav()
     return () => { if (appNavRetryRef.current) clearTimeout(appNavRetryRef.current) }
@@ -1326,7 +1338,6 @@ export default function App() {
   })
   const refreshTrigger = useAppSelector(s => s.dashboard.refreshTrigger)
   const { agents: installedAgents, defaultAgent } = useAgents(refreshTrigger)
-  const queryClient = useQueryClient()
   const provider = useProvider()
   const agentSwitchNotice = useAppSelector(s => s.chat.agentSwitchNotice)
   useEffect(() => {
@@ -2764,7 +2775,8 @@ export default function App() {
     </WsContext.Provider>
     {shortcutsOpen && <ShortcutsModal onClose={() => setShortcutsOpen(false)} />}
     <KiroAccountModal open={kiroUsageOpen} onClose={() => setKiroUsageOpen(false)} usage={kiroUsageState} />
-    <CommandPalette
+    <QuickSearchSurface
+      owners={slotOwners}
       open={commandPalette.open}
       onClose={commandPalette.close}
       openShortcuts={toggleShortcutsModal}

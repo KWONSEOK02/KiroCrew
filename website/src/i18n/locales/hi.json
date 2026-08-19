@@ -4243,6 +4243,25 @@
         "select_a_run_to_see_its_phases_agents_and_result": "इसके चरण, एजेंट और परिणाम देखने के लिए कोई रन चुनें।",
         "unknown": "अज्ञात"
       }
+    },
+    "commandBar": {
+      "no_sessions": "कोई सेशन मेल नहीं खाता",
+      "title": "कमांड बार",
+      "placeholder": "कोई कमांड लिखें…",
+      "placeholder_sessions": "सभी सेशन खोजें…",
+      "no_matches": "कोई कमांड मेल नहीं खाता",
+      "searching": "खोज रहे हैं…",
+      "keep_typing": "कम से कम {{min}} अक्षर लिखें",
+      "fallback_sessions": "सेशन में “{{query}}” खोजें",
+      "cmd_search_sessions": "सेशन खोजें",
+      "group_commands": "कमांड",
+      "group_apps": "ऐप",
+      "group_quicklinks": "क्विक लिंक",
+      "group_settings": "सेटिंग्स",
+      "manifest": {
+        "display_name": "कमांड बार",
+        "description": "खोज शब्द नहीं, कमांड लिखें। पहले ऐप कमांड, क्विक लिंक और सेटिंग्स दिखती हैं; भारी खोज तभी लोड होती है जब उसमें जाते हैं।"
+      }
     }
   },
   "autoImprovement": {

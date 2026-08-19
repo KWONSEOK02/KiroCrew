@@ -1,0 +1,25 @@
+{
+  "name": "command-bar",
+  "version": "0.1.0",
+  "displayName": "Command Bar",
+  "description": "Type a command, not a query. A launcher for the things you actually do — app commands, quicklinks and settings first, with heavier searches loaded only once you enter them.",
+  "author": "kirocrew",
+  "license": "MIT",
+  "tags": [
+    "launcher",
+    "commands",
+    "productivity",
+    "keyboard"
+  ],
+  "defaultEnabled": false,
+  "minKiroCrewVersion": "0.1.0",
+  "ui": {
+    "overlays": [
+      {
+        "id": "command-bar",
+        "label": "Command Bar",
+        "replaces": "quick-search"
+      }
+    ]
+  }
+}

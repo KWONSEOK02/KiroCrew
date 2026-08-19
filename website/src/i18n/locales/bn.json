@@ -4243,6 +4243,25 @@
         "select_a_run_to_see_its_phases_agents_and_result": "ফেজ, এজেন্ট ও ফলাফল দেখতে একটি রান বেছে নিন।",
         "unknown": "অজানা"
       }
+    },
+    "commandBar": {
+      "no_sessions": "কোনো সেশন মেলেনি",
+      "title": "কমান্ড বার",
+      "placeholder": "কমান্ড লিখুন…",
+      "placeholder_sessions": "সব সেশন খুঁজুন…",
+      "no_matches": "কোনো কমান্ড মেলেনি",
+      "searching": "খোঁজা হচ্ছে…",
+      "keep_typing": "অন্তত {{min}} অক্ষর লিখুন",
+      "fallback_sessions": "সেশনে “{{query}}” খুঁজুন",
+      "cmd_search_sessions": "সেশন খুঁজুন",
+      "group_commands": "কমান্ড",
+      "group_apps": "অ্যাপ",
+      "group_quicklinks": "কুইক লিঙ্ক",
+      "group_settings": "সেটিংস",
+      "manifest": {
+        "display_name": "কমান্ড বার",
+        "description": "খোঁজার শব্দ নয়, কমান্ড লিখুন। আগে অ্যাপ কমান্ড, কুইক লিঙ্ক ও সেটিংস দেখায়; ভারী খোঁজা কেবল ভিতরে ঢোকার পরেই লোড হয়।"
+      }
     }
   },
   "autoImprovement": {

@@ -1079,3 +1079,96 @@ class TestScalarGrantDoesNotBecomeAWildcard:
 
         assert Permissions.from_dict({"exposeToApps": ["*"]}).exposeToApps == ["*"]
         assert Permissions.from_dict({"events": ["*"]}).events == ["*"]
+
+
+# ---------------------------------------------------------------------------
+# UI overlays
+# ---------------------------------------------------------------------------
+
+
+def _overlay_manifest(*overlays) -> AppManifest:
+    return AppManifest.from_dict(_valid_manifest(ui={"overlays": list(overlays)}))
+
+
+def test_overlay_parses_and_round_trips():
+    decl = {"id": "command-bar", "label": "Command Bar", "replaces": "quick-search"}
+    m = _overlay_manifest(decl)
+    assert len(m.ui.overlays) == 1
+    assert m.ui.overlays[0].id == "command-bar"
+    assert m.ui.overlays[0].replaces == "quick-search"
+    assert m.validate() == []
+    # Round-trip must preserve the declaration, or the frontend stops seeing the slot.
+    assert AppManifest.from_dict(m.to_dict()).ui.overlays == m.ui.overlays
+
+
+def test_overlay_omits_empty_replaces_from_dict():
+    m = _overlay_manifest({"id": "hud", "label": "HUD"})
+    assert m.to_dict()["ui"]["overlays"] == [{"id": "hud", "label": "HUD"}]
+
+
+def test_overlay_without_overlays_key_is_empty_not_none():
+    m = AppManifest.from_dict(_valid_manifest(ui={"pages": [{"route": "/x", "label": "X"}]}))
+    assert m.ui.overlays == []
+    assert "overlays" not in m.to_dict()["ui"]
+
+
+def test_overlay_non_dict_entries_are_dropped():
+    m = AppManifest.from_dict(_valid_manifest(ui={"overlays": ["nope", 7, None]}))
+    assert m.ui.overlays == []
+
+
+@pytest.mark.parametrize("value", [None, "overlays", 7, {"id": "x"}])
+def test_overlay_non_list_value_parses_to_empty(value):
+    """A present-but-not-a-list ``overlays`` must not raise.
+
+    ``dict.get`` returns the stored value rather than the default when the key
+    exists, so a hand-edited manifest carrying ``"overlays": null`` would otherwise
+    iterate ``None`` and take install validation down with a TypeError.
+    """
+    m = AppManifest.from_dict(_valid_manifest(ui={"overlays": value}))
+    assert m.ui.overlays == []
+    assert m.validate() == []
+
+
+@pytest.mark.parametrize(
+    "decl,expected",
+    [
+        ({"label": "No Id"}, "ui overlay missing required field: id"),
+        ({"id": "Command-Bar", "label": "Caps"}, "ui overlay id must be kebab-case: 'Command-Bar'"),
+        ({"id": "-lead", "label": "Dash"}, "ui overlay id must be kebab-case: '-lead'"),
+        ({"id": "a/b", "label": "Slash"}, "ui overlay id must be kebab-case: 'a/b'"),
+        ({"id": "ok"}, "ui overlay 'ok' missing required field: label"),
+    ],
+)
+def test_overlay_validation_rejects(decl, expected):
+    assert expected in _overlay_manifest(decl).validate()
+
+
+def test_overlay_duplicate_ids_rejected():
+    decl = {"id": "dup", "label": "Dup"}
+    assert "ui overlay duplicate id: 'dup'" in _overlay_manifest(decl, dict(decl)).validate()
+
+
+def test_overlay_replaces_must_be_a_slug():
+    errors = _overlay_manifest({"id": "ok", "label": "Ok", "replaces": "Quick Search"}).validate()
+    assert any("replaces must be kebab-case: 'Quick Search'" in e for e in errors)
+
+
+def test_command_bar_builtin_is_overlay_only_and_default_off():
+    """The shipped Command Bar app is the first overlay-only builtin.
+
+    Its shape is load-bearing: no page (it is not routed), no backend entry point (so
+    enabling it spawns no process), and default-off (the previous ⌘K surface stays in
+    place until the user opts in).
+    """
+    raw = json.loads(
+        (
+            _REPO_ROOT / "src/kiro_crew/apps/builtins/command_bar/app.json"
+        ).read_text(encoding="utf-8")
+    )
+    m = AppManifest.from_dict(raw)
+    assert m.validate() == []
+    assert raw["defaultEnabled"] is False
+    assert m.ui.pages == []
+    assert not m.backend.entryPoint
+    assert [(o.id, o.replaces) for o in m.ui.overlays] == [("command-bar", "quick-search")]

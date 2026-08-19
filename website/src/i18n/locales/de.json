@@ -801,6 +801,25 @@
         "start_a_new_one_several_can_run_at_once": "Starte ein neues — mehrere können gleichzeitig laufen."
       }
     },
+    "commandBar": {
+      "no_sessions": "Keine passenden Sitzungen",
+      "title": "Befehlsleiste",
+      "placeholder": "Befehl eingeben…",
+      "placeholder_sessions": "Alle Sitzungen durchsuchen…",
+      "no_matches": "Keine passenden Befehle",
+      "searching": "Suche läuft…",
+      "keep_typing": "Mindestens {{min}} Zeichen eingeben",
+      "fallback_sessions": "Sitzungen nach „{{query}}“ durchsuchen",
+      "cmd_search_sessions": "Sitzungen durchsuchen",
+      "group_commands": "Befehle",
+      "group_apps": "Apps",
+      "group_quicklinks": "Schnellzugriffe",
+      "group_settings": "Einstellungen",
+      "manifest": {
+        "display_name": "Befehlsleiste",
+        "description": "Einen Befehl eingeben, keine Suchanfrage. Ein Starter für das, was Sie wirklich tun: zuerst App-Befehle, Schnellzugriffe und Einstellungen; schwere Suchen laden erst beim Öffnen."
+      }
+    },
     "crewCompanion": {
       "accessory": {
         "coffee": "Kaffee",

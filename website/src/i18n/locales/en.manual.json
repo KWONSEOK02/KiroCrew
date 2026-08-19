@@ -1123,6 +1123,21 @@
         "open_in_finder": "Open in Finder",
         "show_in_file_manager": "Show in file manager"
       }
+    },
+    "commandBar": {
+      "no_sessions": "No sessions match",
+      "title": "Command Bar",
+      "placeholder": "Type a command…",
+      "placeholder_sessions": "Search all sessions…",
+      "no_matches": "No commands match",
+      "searching": "Searching…",
+      "keep_typing": "Type at least {{min}} characters",
+      "fallback_sessions": "Search sessions for “{{query}}”",
+      "cmd_search_sessions": "Search Sessions",
+      "group_commands": "Commands",
+      "group_apps": "Apps",
+      "group_quicklinks": "Quicklinks",
+      "group_settings": "Settings"
     }
   },
   "components": {

@@ -776,6 +776,25 @@
         "start_a_new_one_several_can_run_at_once": "新しく開始してください — 複数を同時に実行できます。"
       }
     },
+    "commandBar": {
+      "no_sessions": "一致するセッションはありません",
+      "title": "コマンドバー",
+      "placeholder": "コマンドを入力…",
+      "placeholder_sessions": "すべてのセッションを検索…",
+      "no_matches": "一致するコマンドはありません",
+      "searching": "検索中…",
+      "keep_typing": "{{min}} 文字以上入力してください",
+      "fallback_sessions": "セッションを「{{query}}」で検索",
+      "cmd_search_sessions": "セッションを検索",
+      "group_commands": "コマンド",
+      "group_apps": "アプリ",
+      "group_quicklinks": "クイックリンク",
+      "group_settings": "設定",
+      "manifest": {
+        "display_name": "コマンドバー",
+        "description": "検索語ではなくコマンドを入力します。アプリのコマンド、クイックリンク、設定を先に並べ、重い検索は入ってから読み込みます。"
+      }
+    },
     "crewCompanion": {
       "accessory": {
         "coffee": "コーヒー",

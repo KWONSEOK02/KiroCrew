@@ -4371,6 +4371,25 @@
         "select_a_run_to_see_its_phases_agents_and_result": "Выберите запуск, чтобы увидеть его этапы, агентов и результат.",
         "unknown": "Неизвестно"
       }
+    },
+    "commandBar": {
+      "no_sessions": "Нет подходящих сессий",
+      "title": "Панель команд",
+      "placeholder": "Введите команду…",
+      "placeholder_sessions": "Поиск по всем сессиям…",
+      "no_matches": "Нет подходящих команд",
+      "searching": "Поиск…",
+      "keep_typing": "Введите не менее {{min}} символов",
+      "fallback_sessions": "Найти «{{query}}» в сессиях",
+      "cmd_search_sessions": "Поиск сессий",
+      "group_commands": "Команды",
+      "group_apps": "Приложения",
+      "group_quicklinks": "Быстрые ссылки",
+      "group_settings": "Настройки",
+      "manifest": {
+        "display_name": "Панель команд",
+        "description": "Вводите команду, а не поисковый запрос. Запуск того, что вы действительно делаете: сначала команды приложений, быстрые ссылки и настройки; тяжёлый поиск загружается только после входа в него."
+      }
     }
   },
   "autoImprovement": {

@@ -776,6 +776,25 @@
         "start_a_new_one_several_can_run_at_once": "새로 시작하세요 — 여러 개를 동시에 실행할 수 있습니다."
       }
     },
+    "commandBar": {
+      "no_sessions": "일치하는 세션이 없습니다",
+      "title": "커맨드 바",
+      "placeholder": "명령을 입력하세요…",
+      "placeholder_sessions": "모든 세션 검색…",
+      "no_matches": "일치하는 명령이 없습니다",
+      "searching": "검색 중…",
+      "keep_typing": "{{min}}자 이상 입력하세요",
+      "fallback_sessions": "세션에서 {{query}} 검색",
+      "cmd_search_sessions": "세션 검색",
+      "group_commands": "명령",
+      "group_apps": "앱",
+      "group_quicklinks": "빠른 링크",
+      "group_settings": "설정",
+      "manifest": {
+        "display_name": "커맨드 바",
+        "description": "검색어가 아니라 명령을 입력합니다. 앱 명령과 빠른 링크, 설정을 먼저 보여주고 무거운 검색은 들어간 뒤에 불러옵니다."
+      }
+    },
     "crewCompanion": {
       "accessory": {
         "coffee": "커피",

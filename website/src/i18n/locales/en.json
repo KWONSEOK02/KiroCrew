@@ -694,6 +694,12 @@
         "start_a_new_one_several_can_run_at_once": "Start a new one — several can run at the same time."
       }
     },
+    "commandBar": {
+      "manifest": {
+        "display_name": "Command Bar",
+        "description": "Type a command, not a query. A launcher for the things you actually do — app commands, quicklinks and settings first, with heavier searches loaded only once you enter them."
+      }
+    },
     "crewCompanion": {
       "manifest": {
         "description": "A desktop companion for Kiro Crew that helps you pace your day: it nudges you to take breaks, holds the reminders you set in plain language, and runs a short breathing exercise when you need to reset. It also lets you know when a session finishes, fails, or needs your OK.",
